@@ -1,11 +1,10 @@
-import os
-import json
 import argparse
 import numpy as np
-import pytrec_eval
-from utils import read_json
+import pandas as pd
 from rank_bm25 import BM25Okapi
 from dataloader import get_data
+from utils import read_json
+from metrics import calculate_ndcg
 
 if __name__ == "__main__":
 
@@ -41,8 +40,10 @@ if __name__ == "__main__":
 
     # concat all OCR text from source language (0th index)
     df_posts_split['ocr_all_srclang'] = df_posts_split['ocr'].apply(lambda x: ' '.join([i[0] for i in x]) if x else "")
+
     # extract text from source language (0th index)
     df_posts_split['text_srclang'] = df_posts_split['text'].apply(lambda x: x[0] if x else "")
+
     # query: OCR + text
     df_posts_split['query'] = df_posts_split['ocr_all_srclang'] + ' ' + df_posts_split['text_srclang']
 
@@ -50,6 +51,7 @@ if __name__ == "__main__":
     # extract claim and title from source language (0th index)
     df_fact_checks['claim_srclang'] = df_fact_checks['claim'].apply(lambda x: x[0] if x else "")
     df_fact_checks['title_srclang'] = df_fact_checks['title'].apply(lambda x: x[0] if x else "")
+
     # doc: claim + title
     df_fact_checks['doc'] = df_fact_checks['claim_srclang'] + ' ' + df_fact_checks['title_srclang']
 
@@ -60,53 +62,28 @@ if __name__ == "__main__":
     bm25 = BM25Okapi(tokenized_corpus)
 
     fact_check_ids = df_fact_checks.index.tolist()
-    
-    metrics=['P_3', 'P_5', 'P_10', 'map_cut_3', 'map_cut_5', 'map_cut_10', 'ndcg_cut_3', 'ndcg_cut_5', 'ndcg_cut_10']
-    average_scores = {metric: 0.0 for metric in metrics}
+
+    # Calculate NDCG@10 for each query
+    ndcg_scores = []
+    k = 10
 
     for idx, row in df_posts_split.iterrows():
-
-        qrels = {}
-        runs = {}
-
         query = row['query']
         tokenized_query = query.split(" ")
         doc_scores = bm25.get_scores(tokenized_query)
 
         ranked_fact_checks = [fact_check_ids[i] for i in np.argsort(doc_scores)[::-1]]
-        ranked_fact_checks_scores = [doc_scores[i] for i in np.argsort(doc_scores)[::-1]]
-
-        ## keep top 20 fact checks
-        ranked_fact_checks = ranked_fact_checks[:10]
-        ranked_fact_checks_scores = ranked_fact_checks_scores[:10]
 
         ground_truth = df_fact_check_post_mapping[
             df_fact_check_post_mapping['post_id'] == idx
         ]['fact_check_id'].tolist()
+        print("Ground truth:", ground_truth)
 
-        ## keys must be strings
-        qrels[str(idx)] = {str(fc_id): 1 for fc_id in ground_truth}
-        runs[str(idx)] = {str(fc_id): score for fc_id, score in zip(ranked_fact_checks, ranked_fact_checks_scores)}
-
-        evaluator = pytrec_eval.RelevanceEvaluator(qrels, metrics)
-        results = evaluator.evaluate(runs)
-
-        for query_id in results:
-            for metric in metrics:
-                average_scores[metric] += results[query_id][metric]
+        # Calculate NDCG@10
+        ndcg = calculate_ndcg(ranked_fact_checks, ground_truth, k)
+        ndcg_scores.append(ndcg)
+        print("NDCG@10:", ndcg)
         
-    for metric in average_scores:
-        average_scores[metric] /= len(df_posts_split)
-
-    print("Average scores:")
-    print(average_scores)
-
-    ## save results
-    OUTPUT_DIR = 'output'
-    if not os.path.exists(OUTPUT_DIR):
-        os.makedirs(OUTPUT_DIR)
-
-    with open(f"{OUTPUT_DIR}/bm25_{TASK}_{LANG}_{SPLIT}.json", 'w') as f:
-        json.dump(average_scores, f, indent=1)
-    
-
+    # Calculate and print average NDCG@10
+    mean_ndcg = np.mean(ndcg_scores)
+    print(f"\nAverage NDCG@{k}: {mean_ndcg:.4f}")
