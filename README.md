@@ -20,6 +20,12 @@ Please refer to CS646_Final_Report.pdf for more details.
   ```bash
   python expand_fact_check_docs.py
 
+## 3. Summarizing scraped content from URLs using Llama. 
+- Modify the name of the jsonl file containg scraped content
+- Run the following command:
+  ```bash
+  python llama_summarize_scraped.py
+
 
 ## Adjusting the Prompt and CSV Paths
 - Modify the prompt and CSV file paths in the script depending on whether you're using **monolingual** or **cross-lingual** data.
