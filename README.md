@@ -21,7 +21,7 @@ Please refer to CS646_Final_Report.pdf for more details.
   python expand_fact_check_docs.py
 
 ## 3. Summarizing scraped content from URLs using Llama. 
-- Modify the name of the jsonl file containg scraped content
+- Modify the name of the jsonl file containing scraped content inside the script.
 - Run the following command:
   ```bash
   python llama_summarize_scraped.py
