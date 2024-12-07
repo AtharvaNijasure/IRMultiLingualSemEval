@@ -26,7 +26,6 @@ Please refer to CS646_Final_Report.pdf for more details.
   ```bash
   python llama_summarize_scraped.py
 
-
 ## Adjusting the Prompt and CSV Paths
 - Modify the prompt and CSV file paths in the script depending on whether you're using **monolingual** or **cross-lingual** data.
 - Use the `istart` and `iend` variables in the script to control the range of data generation.
